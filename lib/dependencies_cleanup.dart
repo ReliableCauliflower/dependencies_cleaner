@@ -1,5 +1,9 @@
 import 'package:dependencies_cleaner/dart_commands.dart';
 import 'package:dependencies_cleaner/models/pubspec_file_data.dart';
+import 'package:path/path.dart';
+import 'package:yaml/yaml.dart';
+
+import 'values.dart';
 
 Future<List<String>> cleanUpDependencies(
   List<PubspecFileData> pubspecFilesData,
@@ -16,11 +20,15 @@ Future<List<String>> cleanUpDependencies(
     }
     final Set<String> dependenciesToKeep = {};
     for (final dartFile in dartFiles) {
-      final dartFileLines = dartFile.readAsLinesSync();
-      final importsString = _getImportsString(dartFileLines);
+      final fileString = dartFile.readAsStringSync();
       for (final dependency in pubspecDependencies) {
-        if (importsString.contains('package:$dependency')) {
+        if (fileString.contains('package:$dependency')) {
           dependenciesToKeep.add(dependency);
+        } else if (dependency == freezedDependencyName) {
+          final fileName = basenameWithoutExtension(dartFile.path);
+          if (fileString.contains("part '$fileName.$freezedPartSufix';")) {
+            dependenciesToKeep.add(dependency);
+          }
         }
       }
     }
@@ -34,10 +42,17 @@ Future<List<String>> cleanUpDependencies(
       if (dependenciesToKeep.contains(dependency)) {
         continue;
       }
-      String lastDependencyIndent = '';
+      String? lastDependencyIndent;
       for (int i = 0; i < pubspecLines.length; ++i) {
         final pubspecLine = pubspecLines[i];
-        if (lastDependencyIndent.isNotEmpty) {
+        if (pubspecLine.isEmpty) {
+          if (i == pubspecLines.length - 1 || pubspecLines[i + 1].isEmpty) {
+            pubspecLines.removeAt(i);
+            i--;
+            continue;
+          }
+        }
+        if (lastDependencyIndent != null) {
           int currIndentLength = 0;
           for (int i = 0; i < pubspecLine.length; ++i) {
             final char = pubspecLine[i];
@@ -50,40 +65,90 @@ Future<List<String>> cleanUpDependencies(
             linesToRemoveIndexes.add(i);
             continue;
           } else {
-            break;
+            lastDependencyIndent = null;
+            if (!multipleWritesDependencies.contains(dependency)) {
+              break;
+            }
           }
         }
         if (pubspecLine.contains('$dependency:')) {
           lastDependencyIndent =
               pubspecLine.substring(0, pubspecLine.indexOf(dependency));
           linesToRemoveIndexes.add(i);
-          continue;
+        } else {
+          lastDependencyIndent = null;
         }
       }
     }
+    linesToRemoveIndexes.sort();
     for (int i = 0; i < linesToRemoveIndexes.length; ++i) {
       pubspecLines.removeAt(linesToRemoveIndexes[i] - i);
     }
+    final parsedYaml = loadYaml(pubspecLines.join('\n'));
+    final dependencies = (parsedYaml['dependencies'] as YamlMap).keys;
+
+    if (dependencies.isEmpty) {
+      pubspecLines.removeWhere((line) => line.contains('dependencies'));
+    }
+
+    final devDependencies =
+        (parsedYaml['dev_dependencies'] as YamlMap?)?.keys ?? [];
+
+    if (devDependencies.isNotEmpty) {
+      bool canRemoveBuildRunner = true;
+      for (final devDep in devDependencies) {
+        if (devDep == 'build_runner' ||
+            nonBuildRunnerDevDependencies.contains(devDep)) {
+          continue;
+        }
+        canRemoveBuildRunner = false;
+        break;
+      }
+
+      if (canRemoveBuildRunner) {
+        for (int i = 0; i < pubspecLines.length; ++i) {
+          if (pubspecLines[i].contains('dev_dependencies')) {
+            if (devDependencies.length == 1 &&
+                devDependencies.first == 'build_runner') {
+              pubspecLines.removeAt(i);
+              --i;
+            }
+          } else if (pubspecLines[i].contains('build_runner')) {
+            pubspecLines.removeAt(i);
+            break;
+          }
+        }
+      }
+    }
+
+    for (int i = pubspecLines.length - 1; i >= 0; --i) {
+      final line = pubspecLines[i];
+      if (line.isEmpty) {
+        pubspecLines.removeLast();
+      } else {
+        bool isLineOfSpaces = true;
+        for (int i = 0; i < line.length; ++i) {
+          final char = line[i];
+          if (char == ' ') {
+            continue;
+          } else {
+            isLineOfSpaces = false;
+            break;
+          }
+        }
+        if (isLineOfSpaces) {
+          pubspecLines.removeLast();
+        } else {
+          break;
+        }
+      }
+    }
+
     pubspecFile.writeAsStringSync(pubspecLines.join('\n'));
-    final pubspecPath = pubspecFile.path;
-    final packagePath = pubspecPath.substring(
-      0,
-      pubspecPath.lastIndexOf('/') + 1,
-    );
-    await pubGet(packagePath);
+
+    await pubGet(pubspecFile.parent.path);
     cleanedPubspecInfos.add(pubspecFile.absolute.path);
   }
 
   return cleanedPubspecInfos.toList(growable: false);
-}
-
-String _getImportsString(List<String> dartFileLines) {
-  final importLines = <String>[];
-
-  for (final line in dartFileLines) {
-    if (line.startsWith('import') || line.startsWith('export')) {
-      importLines.add(line);
-    }
-  }
-  return importLines.join();
 }

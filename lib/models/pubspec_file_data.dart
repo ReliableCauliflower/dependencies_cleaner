@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:yaml/yaml.dart';
 
+import '../values.dart';
+
 class PubspecFileData {
   final File file;
   final List<File> packageFiles;
@@ -15,8 +17,16 @@ class PubspecFileData {
   static List<String> _getPubspecDependencies(File pubspecFile) {
     final parsedFile = loadYaml(pubspecFile.readAsStringSync()) as YamlMap;
     if (parsedFile.containsKey('dependencies')) {
-      final dependencies = (parsedFile['dependencies'] as YamlMap).keys;
-      return List<String>.from(dependencies);
+      final dependencies = (parsedFile['dependencies'] as YamlMap?)?.keys;
+      final buildRunnerDependencies =
+          (parsedFile['dev_dependencies'] as YamlMap?)?.keys.where(
+                (element) => supportedBuildRunnerDependencies.contains(element),
+              );
+      return [
+        if (dependencies != null) ...List<String>.from(dependencies),
+        if (buildRunnerDependencies != null)
+          ...List<String>.from(buildRunnerDependencies),
+      ];
     }
     return [];
   }
