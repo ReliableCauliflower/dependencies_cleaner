@@ -1,0 +1,13 @@
+- &dart
+  id: dart-dependencies-cleaner
+  name: Dart dependencies cleaner
+  entry: dart pub run dependencies_cleaner:main
+  language: system
+  types: [dart]
+  require_serial: true
+  description: |
+    Dart package to automatically clean unused dependencies from the project and sub packages pubspec.yaml files
+- << : *dart
+  id: flutter-dependencies-cleaner
+  name: Flutter dependencies cleaner
+  entry: flutter pub run dependencies_cleaner:main
