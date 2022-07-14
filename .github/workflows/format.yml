@@ -1,0 +1,18 @@
+name: format
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  dependencies_cleaner:
+    runs-on: ubuntu-latest
+    container:
+      image: google/dart:latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Run dependencies_cleaner
+        run: |
+          pub get
+          pub run dependencies_cleaner:main --exit-if-changed
