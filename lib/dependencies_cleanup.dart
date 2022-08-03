@@ -85,19 +85,10 @@ Future<List<String>> cleanUpDependencies(
       pubspecLines.removeAt(linesToRemoveIndexes[i] - i);
     }
     final parsedYaml = loadYaml(pubspecLines.join('\n'));
-    late final Iterable dependencies;
-    try {
-      dependencies = (parsedYaml['dependencies'] as YamlMap).keys;
-    } catch (e) {
-      print(
-        'Failed to parse dependencies for the pubspec '
-        'at path: ${pubspecFile.path}',
-      );
-      continue;
-    }
+    final dependencies = (parsedYaml['dependencies'] as YamlMap?)?.keys;
 
-    if (dependencies.isEmpty) {
-      pubspecLines.removeWhere((line) => line.contains('dependencies'));
+    if (dependencies?.isEmpty ?? true) {
+      pubspecLines.removeWhere((line) => line.startsWith('dependencies:'));
     }
 
     final devDependencies =
