@@ -1,18 +1,26 @@
 import 'dart:io';
 
+import 'package:pre_commit_helpers/pre_commit_helpers.dart';
 import 'package:yaml/yaml.dart';
 
 import '../values.dart';
 
-class PubspecFileData {
-  final File file;
-  final List<File> packageFiles;
+class PackageInfo {
+  final File pubspecFile;
+  final List<File> dartFiles;
   final List<String> pubspecDependencies;
 
-  PubspecFileData({
-    required this.file,
-    required this.packageFiles,
-  }) : pubspecDependencies = _getPubspecDependencies(file);
+  PackageInfo({
+    required this.pubspecFile,
+    required this.dartFiles,
+  }) : pubspecDependencies = _getPubspecDependencies(pubspecFile);
+
+  factory PackageInfo.fromPackageData(PackageData packageData) {
+    return PackageInfo(
+      pubspecFile: packageData.pubspecFile,
+      dartFiles: packageData.dartFiles,
+    );
+  }
 
   static List<String> _getPubspecDependencies(File pubspecFile) {
     final parsedFile = loadYaml(pubspecFile.readAsStringSync()) as YamlMap;

@@ -1,19 +1,19 @@
-import 'package:dependencies_cleaner/dart_commands.dart';
-import 'package:dependencies_cleaner/models/pubspec_file_data.dart';
+import 'package:dependencies_cleaner/models/package_info.dart';
 import 'package:path/path.dart';
+import 'package:pre_commit_helpers/pre_commit_helpers.dart';
 import 'package:yaml/yaml.dart';
 
 import 'values.dart';
 
 Future<List<String>> cleanUpDependencies(
-  List<PubspecFileData> pubspecFilesData,
+  List<PackageInfo> pubspecFilesData,
 ) async {
   if (pubspecFilesData.isEmpty) {
     return [];
   }
   final Set<String> cleanedPubspecInfos = {};
   for (final pdfFileData in pubspecFilesData) {
-    final dartFiles = pdfFileData.packageFiles;
+    final dartFiles = pdfFileData.dartFiles;
     final pubspecDependencies = pdfFileData.pubspecDependencies;
     if (pubspecDependencies.isEmpty || dartFiles.isEmpty) {
       continue;
@@ -35,7 +35,7 @@ Future<List<String>> cleanUpDependencies(
     if (dependenciesToKeep.length == pubspecDependencies.length) {
       continue;
     }
-    final pubspecFile = pdfFileData.file;
+    final pubspecFile = pdfFileData.pubspecFile;
     final pubspecLines = pubspecFile.readAsLinesSync();
     final linesToRemoveIndexes = <int>[];
     for (final String dependency in pubspecDependencies) {

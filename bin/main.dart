@@ -1,9 +1,9 @@
 import 'dart:io';
 import 'package:dependencies_cleaner/dependencies_cleanup.dart';
+import 'package:pre_commit_helpers/pre_commit_helpers.dart';
 import 'package:yaml/yaml.dart';
 
-import 'package:dependencies_cleaner/models/pubspec_file_data.dart';
-import 'package:dependencies_cleaner/files.dart' as files;
+import 'package:dependencies_cleaner/models/package_info.dart';
 
 const dependenciesCleanerName = 'dependencies_cleaner';
 const additionalPathsName = 'additional_paths';
@@ -11,7 +11,7 @@ const additionalPathsName = 'additional_paths';
 Future<void> main(List<String> args) async {
   final currentPath = Directory.current.path;
 
-  final basePubspecPath = files.getPubspecPath(currentPath);
+  final basePubspecPath = getPubspecPath(currentPath);
   final pubspecYamlFile = File(basePubspecPath);
   final pubspecYaml = loadYaml(pubspecYamlFile.readAsStringSync());
 
@@ -28,14 +28,14 @@ Future<void> main(List<String> args) async {
   final stopwatch = Stopwatch();
   stopwatch.start();
 
-  final List<PubspecFileData> pubspecFilesData = files.pubspecFiles(
+  final packageData = getPackagesData(
     currentPath: currentPath,
     additionalPaths: additionalPaths,
-  );
+  ).map((e) => PackageInfo.fromPackageData(e)).toList();
 
-  stdout.write('┏━━ Checking ${pubspecFilesData.length} packages dependencies');
+  stdout.write('┏━━ Checking ${packageData.length} packages dependencies');
 
-  final cleanedUpPaths = await cleanUpDependencies(pubspecFilesData);
+  final cleanedUpPaths = await cleanUpDependencies(packageData);
 
   if (cleanedUpPaths.isNotEmpty) {
     if (cleanedUpPaths.length > 1) {
