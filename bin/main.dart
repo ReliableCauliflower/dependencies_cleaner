@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:dependencies_cleaner/dependencies_cleanup.dart';
 import 'package:pre_commit_helpers/pre_commit_helpers.dart';
-import 'package:yaml/yaml.dart';
 
 import 'package:dependencies_cleaner/models/package_info.dart';
 
@@ -12,18 +11,12 @@ Future<void> main(List<String> args) async {
   final currentPath = Directory.current.path;
 
   final basePubspecPath = getPubspecPath(currentPath);
-  final pubspecYamlFile = File(basePubspecPath);
-  final pubspecYaml = loadYaml(pubspecYamlFile.readAsStringSync());
 
-  final additionalPaths = <String>[];
-
-  if (pubspecYaml.containsKey(dependenciesCleanerName)) {
-    final config = pubspecYaml[dependenciesCleanerName];
-    if (config.containsKey(additionalPathsName)) {
-      final yamlList = config[additionalPathsName];
-      additionalPaths.addAll(List<String>.from(yamlList));
-    }
-  }
+  final additionalPaths = getArgList(
+    pubspecPath: basePubspecPath,
+    configName: dependenciesCleanerName,
+    argName: additionalPathsName,
+  );
 
   final stopwatch = Stopwatch();
   stopwatch.start();
