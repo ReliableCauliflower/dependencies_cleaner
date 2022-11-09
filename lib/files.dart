@@ -1,59 +1,67 @@
 import 'dart:io';
 
-import 'package:yaml/yaml.dart';
+import 'package:path/path.dart';
 import 'models/pubspec_file_data.dart';
 
-/// Get all the dart files for the project and the contents
+/// Get the project pubspec file(s), its contents and a list of related dart
+/// files. The current algorithm assumes that pubspec.yaml files do not exist in
+/// the same folder with dart files
 List<PubspecFileData> pubspecFiles({
   required String currentPath,
   required List<String> additionalPaths,
-  required String basePubspecPath,
 }) {
-  final packagesDartFiles = <String, List<File>>{};
-  final additionalPathsFileEntities = <FileSystemEntity>[];
-  for (final path in additionalPaths) {
-    additionalPathsFileEntities.addAll(_readDir(currentPath, path));
-  }
-  final allContents = [
-    ..._readDir(currentPath, 'lib'),
-    ..._readDir(currentPath, 'bin'),
-    ..._readDir(currentPath, 'test'),
-    ..._readDir(currentPath, 'tests'),
-    ..._readDir(currentPath, 'test_driver'),
-    ..._readDir(currentPath, 'integration_test'),
-    ...additionalPathsFileEntities,
-  ];
+  final basePubspecPath = getPubspecPath(currentPath);
+  final packagesDartFiles = <String, List<File>>{
+    basePubspecPath: _getPackageBaseFiles(currentPath),
+  };
 
-  String lastPackageDirPath = currentPath;
-  String pubspecPath = basePubspecPath;
-  for (final fileSysEntity in allContents) {
-    if (fileSysEntity is File) {
-      final filePath = fileSysEntity.path;
-      if (filePath.endsWith('.dart')) {
-        if (!filePath.startsWith(lastPackageDirPath)) {
-          pubspecPath = basePubspecPath;
-        }
-        if (packagesDartFiles[pubspecPath] != null) {
-          packagesDartFiles[pubspecPath]!.add(fileSysEntity);
-        } else {
-          packagesDartFiles[pubspecPath] = [fileSysEntity];
-        }
-        ;
-      } else if (filePath.endsWith('pubspec.yaml')) {
-        try {
-          final pubspecYaml = loadYaml(fileSysEntity.readAsStringSync());
-          final pubspecPackageName = pubspecYaml['name'];
-          if (pubspecPackageName != null) {
-            pubspecPath = fileSysEntity.path;
-            lastPackageDirPath = fileSysEntity.parent.path;
+  void addFile(String pubspecPath, File file) {
+    if (packagesDartFiles[pubspecPath] == null) {
+      packagesDartFiles[pubspecPath] = [file];
+    } else {
+      packagesDartFiles[pubspecPath]!.add(file);
+    }
+  }
+
+  void handleAdditionalPaths({required String packagePath}) {
+    final pubspecPath = getPubspecPath(packagePath);
+
+    void checkDir(String dirPath) {
+      final contents = _readDir(
+        dirPath,
+        recursive: false,
+        withDirs: true,
+      )..sort((a, b) {
+          if (a is File) {
+            return -1;
           }
-        } catch (e) {
-          stdout.write('An error occured parsing the $filePath:\n$e');
-          continue;
+          if (b is File) {
+            return 1;
+          }
+          return 0;
+        });
+      for (final fileEntity in contents) {
+        final fileEntityPath = fileEntity.path;
+        if (fileEntity is File) {
+          if (_isPubspecFile(fileEntityPath)) {
+            packagesDartFiles[fileEntityPath] = _getPackageBaseFiles(dirPath);
+            handleAdditionalPaths(packagePath: dirPath);
+            return;
+          } else {
+            addFile(pubspecPath, fileEntity);
+          }
+        } else if (fileEntity is Directory) {
+          checkDir(fileEntity.path);
         }
       }
     }
+
+    for (final path in additionalPaths) {
+      checkDir('$packagePath$separator$path');
+    }
   }
+
+  handleAdditionalPaths(packagePath: currentPath);
 
   final List<PubspecFileData> pubspecFilesData = [];
 
@@ -67,10 +75,50 @@ List<PubspecFileData> pubspecFiles({
   return pubspecFilesData;
 }
 
-List<FileSystemEntity> _readDir(String currentPath, String name) {
-  final dir = Directory('$currentPath/$name');
+List<File> _getPackageBaseFiles(String packagePath) {
+  String getSubDir(String subDirName) {
+    return '$packagePath$separator$subDirName';
+  }
+
+  return [
+    ..._readDir(getSubDir('lib')),
+    ..._readDir(getSubDir('bin')),
+    ..._readDir(getSubDir('test')),
+    ..._readDir(getSubDir('tests')),
+    ..._readDir(getSubDir('test_driver')),
+    ..._readDir(getSubDir('integration_test')),
+  ].cast<File>();
+}
+
+List<FileSystemEntity> _readDir(
+  String dirPath, {
+  bool recursive: true,
+  bool withDirs: false,
+}) {
+  final dir = Directory(dirPath);
   if (dir.existsSync()) {
-    return dir.listSync(recursive: true);
+    return dir
+        .listSync(recursive: recursive)
+        .where((el) => withDirs ? true : el is! Directory)
+        .where((el) {
+      if (withDirs && el is Directory) {
+        return true;
+      }
+      final filePath = el.path;
+      return _isPubspecFile(filePath) || _isDartFile(filePath);
+    }).toList();
   }
   return [];
+}
+
+bool _isPubspecFile(String path) {
+  return path.endsWith('pubspec.yaml');
+}
+
+bool _isDartFile(String path) {
+  return path.endsWith('.dart');
+}
+
+String getPubspecPath(String packagePath) {
+  return '$packagePath${separator}pubspec.yaml';
 }

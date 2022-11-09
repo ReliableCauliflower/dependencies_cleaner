@@ -5,19 +5,22 @@ import 'package:yaml/yaml.dart';
 import 'package:dependencies_cleaner/models/pubspec_file_data.dart';
 import 'package:dependencies_cleaner/files.dart' as files;
 
+const dependenciesCleanerName = 'dependencies_cleaner';
+const additionalPathsName = 'additional_paths';
+
 Future<void> main(List<String> args) async {
   final currentPath = Directory.current.path;
 
-  final basePubspecPath = '${currentPath}/pubspec.yaml';
+  final basePubspecPath = files.getPubspecPath(currentPath);
   final pubspecYamlFile = File(basePubspecPath);
   final pubspecYaml = loadYaml(pubspecYamlFile.readAsStringSync());
 
   final additionalPaths = <String>[];
 
-  if (pubspecYaml.containsKey('dependencies_cleaner')) {
-    final config = pubspecYaml['dependencies_cleaner'];
-    if (config.containsKey('additional_paths')) {
-      final yamlList = config['additional_paths'];
+  if (pubspecYaml.containsKey(dependenciesCleanerName)) {
+    final config = pubspecYaml[dependenciesCleanerName];
+    if (config.containsKey(additionalPathsName)) {
+      final yamlList = config[additionalPathsName];
       additionalPaths.addAll(List<String>.from(yamlList));
     }
   }
@@ -28,7 +31,6 @@ Future<void> main(List<String> args) async {
   final List<PubspecFileData> pubspecFilesData = files.pubspecFiles(
     currentPath: currentPath,
     additionalPaths: additionalPaths,
-    basePubspecPath: basePubspecPath,
   );
 
   stdout.write('┏━━ Checking ${pubspecFilesData.length} packages dependencies');
