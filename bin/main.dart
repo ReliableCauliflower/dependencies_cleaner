@@ -7,6 +7,7 @@ import 'package:dependencies_cleaner/models/package_info.dart';
 const dependenciesCleanerName = 'dependencies_cleaner';
 const additionalPathsName = 'additional_paths';
 const ignorePathsName = 'ignore_paths';
+const ignoreDependenciesName = 'ignore_dependencies';
 
 Future<void> main(List<String> args) async {
   final currentPath = Directory.current.path;
@@ -25,6 +26,12 @@ Future<void> main(List<String> args) async {
     argName: ignorePathsName,
   );
 
+  final ignoreDependencies = getArgList(
+    pubspecPath: basePubspecPath,
+    configName: dependenciesCleanerName,
+    argName: ignoreDependenciesName,
+  );
+
   final stopwatch = Stopwatch();
   stopwatch.start();
 
@@ -36,7 +43,10 @@ Future<void> main(List<String> args) async {
 
   stdout.write('┏━━ Checking ${packageData.length} packages dependencies');
 
-  final cleanedUpPaths = await cleanUpDependencies(packageData);
+  final cleanedUpPaths = await cleanUpDependencies(
+    packageData,
+    ignoreDependencies,
+  );
 
   if (cleanedUpPaths.isNotEmpty) {
     if (cleanedUpPaths.length > 1) {

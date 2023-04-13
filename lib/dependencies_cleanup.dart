@@ -7,6 +7,7 @@ import 'values.dart';
 
 Future<List<String>> cleanUpDependencies(
   List<PackageInfo> pubspecFilesData,
+  List<String> ignoreDependencies,
 ) async {
   if (pubspecFilesData.isEmpty) {
     return [];
@@ -18,7 +19,7 @@ Future<List<String>> cleanUpDependencies(
     if (pubspecDependencies.isEmpty || dartFiles.isEmpty) {
       continue;
     }
-    final Set<String> dependenciesToKeep = {};
+    final Set<String> dependenciesToKeep = {...ignoreDependencies};
     for (final dartFile in dartFiles) {
       final fileString = dartFile.readAsStringSync();
       for (final dependency in pubspecDependencies) {
