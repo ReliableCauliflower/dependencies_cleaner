@@ -43,7 +43,7 @@ Future<List<String>> cleanUpDependencies(
       if (dependenciesToKeep.contains(dependency)) {
         continue;
       }
-      String? lastDependencyIndent;
+      int? lastDependencyIndent;
       for (int i = 0; i < pubspecLines.length; ++i) {
         final pubspecLine = pubspecLines[i];
         if (pubspecLine.isEmpty) {
@@ -54,15 +54,8 @@ Future<List<String>> cleanUpDependencies(
           }
         }
         if (lastDependencyIndent != null) {
-          int currIndentLength = 0;
-          for (int i = 0; i < pubspecLine.length; ++i) {
-            final char = pubspecLine[i];
-            if (char != ' ') {
-              currIndentLength = i;
-              break;
-            }
-          }
-          if (currIndentLength > lastDependencyIndent.length) {
+          final currIndentLength = _getLineIndent(pubspecLine);
+          if (currIndentLength > lastDependencyIndent) {
             linesToRemoveIndexes.add(i);
             continue;
           } else {
@@ -73,8 +66,15 @@ Future<List<String>> cleanUpDependencies(
           }
         }
         if (pubspecLine.contains('$dependency:')) {
-          lastDependencyIndent =
-              pubspecLine.substring(0, pubspecLine.indexOf(dependency));
+          final depIndent = _getLineIndent(pubspecLine);
+          if (i > 0) {
+            final prevDepIndent = _getLineIndent(pubspecLines[i - 1]);
+            if (prevDepIndent > 0 && prevDepIndent < depIndent) {
+              lastDependencyIndent = null;
+              continue;
+            }
+          }
+          lastDependencyIndent = depIndent;
           linesToRemoveIndexes.add(i);
         } else {
           lastDependencyIndent = null;
@@ -152,4 +152,14 @@ Future<List<String>> cleanUpDependencies(
   }
 
   return cleanedPubspecInfos.toList(growable: false);
+}
+
+int _getLineIndent(String pubspecLine) {
+  for (int i = 0; i < pubspecLine.length; ++i) {
+    final char = pubspecLine[i];
+    if (char != ' ') {
+      return i;
+    }
+  }
+  return 0;
 }
